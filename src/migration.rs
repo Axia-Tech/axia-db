@@ -1,18 +1,18 @@
-// Copyright 2015-2020 AXIA Technologies (UK) Ltd.
-// This file is part of AXIA.
+// Copyright 2015-2020 Axia Technologies (UK) Ltd.
+// This file is part of Axia.
 
-// AXIA is free software: you can redistribute it and/or modify
+// Axia is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// AXIA is distributed in the hope that it will be useful,
+// Axia is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with AXIA.  If not, see <http://www.gnu.org/licenses/>.
+// along with Axia.  If not, see <http://www.gnu.org/licenses/>.
 
 /// Database migration.
 
@@ -37,14 +37,14 @@ pub fn migrate(from: &Path, mut to: Options, overwrite: bool, force_migrate: &Ve
 	}
 
 	// Make sure we are using the same salt value.
-	to.salt = Some(source_meta.salt);
+	to.salt = source_meta.salt;
 
 	if (to.salt.is_none()) && overwrite {
 		return Err(Error::Migration("Changing salt need to update metadata at once.".into()));
 	}
 
 	let mut source_options = Options::with_columns(from, source_meta.columns.len() as u8);
-	source_options.salt = Some(source_meta.salt);
+	source_options.salt = source_meta.salt;
 	source_options.columns = source_meta.columns;
 	
 	let mut source = Db::open(&source_options)?;

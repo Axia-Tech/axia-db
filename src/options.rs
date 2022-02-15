@@ -1,18 +1,18 @@
-// Copyright 2015-2020 AXIA Technologies (UK) Ltd.
-// This file is part of AXIA.
+// Copyright 2015-2020 Axia Technologies (UK) Ltd.
+// This file is part of Axia.
 
-// AXIA is free software: you can redistribute it and/or modify
+// Axia is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// AXIA is distributed in the hope that it will be useful,
+// Axia is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with AXIA.  If not, see <http://www.gnu.org/licenses/>.
+// along with Axia.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::io::Write;
 use std::collections::HashMap;
@@ -22,9 +22,9 @@ use crate::column::Salt;
 use crate::compress::CompressionType;
 use rand::Rng;
 
-pub const CURRENT_VERSION: u32 = 5;
-// TODO on last supported 5, remove MULTIHEAD_V4 and MULTIPART_V4
-const LAST_SUPPORTED_VERSION: u32 = 4;
+pub const CURRENT_VERSION: u32 = 4;
+// TODO on last supported 4, remove `ValueTable` `no_compression` field.
+const LAST_SUPPORTED_VERSION: u32 = 3;
 
 /// Database configuration.
 #[derive(Clone, Debug)]
@@ -70,8 +70,8 @@ pub struct ColumnOptions {
 /// Database metadata.
 #[derive(Clone, Debug)]
 pub struct Metadata {
-	/// Salt value.
-	pub salt: Salt,
+	/// Salt value. `None` only for version <= 3.
+	pub salt: Option<Salt>,
 	/// Database version.
 	pub version: u32,
 	/// Column metadata.
@@ -207,7 +207,7 @@ impl Options {
 			Ok(Metadata {
 				version: CURRENT_VERSION,
 				columns: self.columns.clone(),
-				salt: s,
+				salt: Some(s),
 			})
 		} else {
 			Err(Error::InvalidConfiguration("Database does not exist. To create a new one, use open_or_create".into()))
@@ -246,7 +246,12 @@ impl Options {
 			return Err(Error::InvalidConfiguration(format!(
 						"Unsupported database version {}. Expected {}", version, CURRENT_VERSION)));
 		}
-		let salt = salt.ok_or_else(|| Error::InvalidConfiguration("Missing salt value".into()))?;
+		if version == 3 {
+			//Treat all tables as ref counted.
+			for mut col in &mut columns {
+				col.ref_counted = true;
+			}
+		}
 		Ok(Some(Metadata {
 			version,
 			columns,
@@ -266,6 +271,12 @@ impl Options {
 
 impl Metadata {
 	pub fn columns_to_migrate(&self) -> std::collections::BTreeSet<u8> {
-		std::collections::BTreeSet::new()
+		let mut result = std::collections::BTreeSet::new();
+		if self.version == 3 {
+			for i in 0 .. self.columns.len() as u8 {
+				result.insert(i);
+			}
+		}
+		result
 	}
 }

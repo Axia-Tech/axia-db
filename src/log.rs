@@ -1,18 +1,18 @@
-// Copyright 2015-2020 AXIA Technologies (UK) Ltd.
-// This file is part of AXIA.
+// Copyright 2015-2020 Axia Technologies (UK) Ltd.
+// This file is part of Axia.
 
-// AXIA is free software: you can redistribute it and/or modify
+// Axia is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// AXIA is distributed in the hope that it will be useful,
+// Axia is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with AXIA.  If not, see <http://www.gnu.org/licenses/>.
+// along with Axia.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::{VecDeque, HashMap};
 use std::io::{Read, Write, Seek};
@@ -522,8 +522,7 @@ impl Log {
 	pub fn end_record(&self, log: LogChange) -> Result<u64> {
 		assert!(log.record_id + 1 == self.next_record_id.load(Ordering::Relaxed));
 		let record_id = log.record_id;
-		let mut appending = self.appending.write();
-		if appending.is_none() {
+		if self.appending.read().is_none() {
 			// Find a log file in the pool or create a new one
 			let (id, file) = if let Some((id, file)) = self.log_pool.write().pop_front() {
 				log::debug!(target: "axia-db", "Flush: Activated pool writer {}", id);
@@ -536,12 +535,13 @@ impl Log {
 				log::debug!(target: "axia-db", "Flush: Activated new writer {}", id);
 				(id, file)
 			};
-			*appending = Some(Appending {
+			*self.appending.write() = Some(Appending {
 				size: 0,
 				file: std::io::BufWriter::new(file),
 				id,
 			});
 		}
+		let mut appending = self.appending.write();
 		let appending = appending.as_mut().unwrap();
 		let (index, values, bytes) = log.to_file(&mut appending.file)?;
 		let mut overlays = self.overlays.write();

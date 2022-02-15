@@ -1,18 +1,18 @@
-// Copyright 2015-2020 AXIA Technologies (UK) Ltd.
-// This file is part of AXIA.
+// Copyright 2015-2020 Axia Technologies (UK) Ltd.
+// This file is part of Axia.
 
-// AXIA is free software: you can redistribute it and/or modify
+// Axia is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// AXIA is distributed in the hope that it will be useful,
+// Axia is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with AXIA.  If not, see <http://www.gnu.org/licenses/>.
+// along with Axia.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -53,7 +53,7 @@ pub struct Column {
 	uniform_keys: bool,
 	collect_stats: bool,
 	ref_counted: bool,
-	salt: Salt,
+	salt: Option<Salt>,
 	stats: ColumnStats,
 	compression: Compress,
 	db_version: u32,
@@ -188,8 +188,10 @@ impl Column {
 		let mut k = Key::default();
 		if self.uniform_keys {
 			k.copy_from_slice(&key[0..32]);
+		} else if let Some(salt) = &self.salt {
+			k.copy_from_slice(blake2_rfc::blake2b::blake2b(32, &salt[..], &key).as_bytes());
 		} else {
-			k.copy_from_slice(blake2_rfc::blake2b::blake2b(32, &self.salt, &key).as_bytes());
+			k.copy_from_slice(blake2_rfc::blake2b::blake2b(32, &[], &key).as_bytes());
 		}
 		k
 	}
@@ -421,8 +423,8 @@ impl Column {
 					true
 				};
 				if remove {
-					if let Some((compressed_size, uncompressed_size)) = cur_size {
-						self.stats.remove_val(uncompressed_size, compressed_size);
+					if let Some((cur_size, compressed_size)) = cur_size {
+						self.stats.remove_val(cur_size, compressed_size);
 					}
 					table.write_remove_plan(key, sub_index, log)?;
 				}
@@ -595,7 +597,7 @@ impl Column {
 					},
 				};
 				let mut key = source.recover_key_prefix(c, *entry);
-				key[6..].copy_from_slice(&pk);
+				&mut key[6..].copy_from_slice(&pk);
 				let value = if compressed {
 						self.decompress(&value)
 				} else {
